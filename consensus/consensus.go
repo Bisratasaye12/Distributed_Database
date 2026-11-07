@@ -194,8 +194,18 @@ func (c *Consensus) setupDB(dataDir string) error {
 		return err
 	}
 
+	// Raft rebuilds the database from its snapshot and log on startup, so
+	// a SQLite file left from the previous run must go. Keeping it would
+	// apply every logged write a second time.
+	c.dbPath = filepath.Join(dbDir, "sqlite.db")
+	for _, suffix := range []string{"", "-wal", "-shm", "-journal"} {
+		if err := os.Remove(c.dbPath + suffix); err != nil && !os.IsNotExist(err) {
+			return err
+		}
+	}
+
 	var err error
-	c.db, err = engine.Open(filepath.Join(dbDir, "sqlite.db"))
+	c.db, err = engine.Open(c.dbPath)
 	return err
 }
 

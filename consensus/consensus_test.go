@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -196,4 +197,61 @@ func convertToJSON(a any) string {
 	}
 
 	return string(j)
+}
+
+func openSingleNode(t *testing.T, datadir string, port int) *Consensus {
+	t.Helper()
+
+	conf := &Config{}
+	conf.Raft.LocalID = raft.ServerID("0")
+	conf.Raft.HeartbeatTimeout = 50 * time.Millisecond
+	conf.Raft.ElectionTimeout = 50 * time.Millisecond
+	conf.Raft.Bootstrap = true
+	conf.Raft.LeaderLeaseTimeout = 50 * time.Millisecond
+	conf.Raft.CommitTimeout = 5 * time.Millisecond
+	conf.Raft.SnapshotThreshold = 10000
+
+	ln, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", port))
+	require.NoError(t, err)
+	conf.Transport = &Transport{ln: ln}
+
+	s, err := NewDB(datadir, conf)
+	require.NoError(t, err)
+	require.NoError(t, s.WaitForLeader(3*time.Second))
+	return s
+}
+
+// Raft replays its log when a node restarts. If the old SQLite file were
+// kept, every write in the log would be applied a second time.
+func TestRestartDoesNotReapplyWrites(t *testing.T) {
+	datadir := t.TempDir()
+	port, err := getFreePort()
+	require.NoError(t, err)
+
+	s := openSingleNode(t, datadir, port)
+	_, err = s.Exec(&pb.Request{Statements: []*pb.Statement{
+		{Sql: "CREATE TABLE test (id INTEGER NOT NULL PRIMARY KEY, name TEXT)"},
+		{Sql: `INSERT INTO test(name) VALUES("atest")`},
+	}})
+	require.NoError(t, err)
+	require.NoError(t, s.Close())
+
+	s = openSingleNode(t, datadir, port)
+	t.Cleanup(func() { s.Close() })
+
+	count := func() string {
+		r, err := s.Query(&pb.QueryReq{
+			Request:           &pb.Request{Statements: []*pb.Statement{{Sql: "SELECT count(*) FROM test"}}},
+			StrongConsistency: true,
+		})
+		if err != nil {
+			return err.Error()
+		}
+		out, _ := encoding.ProtoToJSON(r)
+		return string(out)
+	}
+
+	require.Eventually(t, func() bool {
+		return strings.Contains(count(), `"values":[[1]]`)
+	}, 10*time.Second, 100*time.Millisecond, "got %s", count())
 }

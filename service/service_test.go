@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"testing"
 
+	"github.com/Bisratasaye12/Distributed_Database/consensus"
 	"github.com/Bisratasaye12/Distributed_Database/pb"
 	"github.com/stretchr/testify/require"
 )
@@ -47,10 +49,12 @@ func TestInvalid(t *testing.T) {
 
 type testpb struct {
 	leaderAddr string
+	servers    []*pb.Server
+	execErr    error
 }
 
 func (m *testpb) Exec(er *pb.Request) ([]*pb.ExecRes, error) {
-	return nil, nil
+	return nil, m.execErr
 }
 
 func (m *testpb) Query(qr *pb.QueryReq) ([]*pb.QueryRes, error) {
@@ -70,7 +74,7 @@ func (m *testpb) LeaderAddr() string {
 }
 
 func (m *testpb) GetServers() ([]*pb.Server, error) {
-	return nil, nil
+	return m.servers, nil
 }
 
 func (m *testpb) Metrics() (map[string]any, error) {
@@ -194,4 +198,66 @@ func TestMetrics(t *testing.T) {
 		_, ok := runtimeMap[field]
 		require.True(t, ok)
 	}
+}
+
+func startTestService(t *testing.T, m *testpb) string {
+	t.Helper()
+
+	s, err := NewService("127.0.0.1:0", m, Config{})
+	require.NoError(t, err)
+	require.NoError(t, s.Start())
+	t.Cleanup(func() { s.Close() })
+
+	return fmt.Sprintf("http://%s", s.Addr().String())
+}
+
+func TestServers(t *testing.T) {
+	host := startTestService(t, &testpb{servers: []*pb.Server{
+		{Id: "node1", RpcAddr: "127.0.0.1:8946", IsLeader: true},
+		{Id: "node2", RpcAddr: "127.0.0.1:8947"},
+	}})
+
+	resp, err := http.Get(host + "/servers")
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+
+	var body struct {
+		Servers []*pb.Server `json:"servers"`
+	}
+	require.NoError(t, json.NewDecoder(resp.Body).Decode(&body))
+	require.Len(t, body.Servers, 2)
+	require.Equal(t, "node1", body.Servers[0].Id)
+	require.True(t, body.Servers[0].IsLeader)
+}
+
+func TestServersRejectsPost(t *testing.T) {
+	host := startTestService(t, &testpb{})
+
+	resp, err := http.Post(host+"/servers", "application/json", nil)
+	require.NoError(t, err)
+	resp.Body.Close()
+	require.Equal(t, http.StatusMethodNotAllowed, resp.StatusCode)
+}
+
+// A follower must redirect writes with 307, not 301, otherwise clients
+// turn the POST into a GET and drop the SQL.
+func TestExecOnFollowerRedirectsWith307(t *testing.T) {
+	host := startTestService(t, &testpb{
+		execErr:    consensus.ErrNotLeader,
+		leaderAddr: "127.0.0.1:9999",
+	})
+
+	client := &http.Client{
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
+	}
+	resp, err := client.Post(host+"/execute", "application/json",
+		strings.NewReader(`["INSERT INTO t VALUES (1)"]`))
+	require.NoError(t, err)
+	resp.Body.Close()
+
+	require.Equal(t, http.StatusTemporaryRedirect, resp.StatusCode)
+	require.Contains(t, resp.Header.Get("Location"), "/execute")
 }

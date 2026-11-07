@@ -1,0 +1,10 @@
+This project is based on distsql by nireo
+https://github.com/nireo/distsql (commit 0194b68, 2024-01-01)
+Copyright (C) nireo, licensed under the GNU General Public License v3.0.
+
+Modified by Bisrat Asaye, 2025-2026. Changes are listed in README.md under
+"Changes from upstream" and in the git history of this repository.
+
+This program is distributed under the same license (see LICENSE), WITHOUT
+ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+FITNESS FOR A PARTICULAR PURPOSE.

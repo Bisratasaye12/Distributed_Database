@@ -1,8 +1,5 @@
 /.DS_Store
-/.github
-/LICENSE
-/data1
-/data2
+/data*/
 /terminal
 # build output
 /distributed_database

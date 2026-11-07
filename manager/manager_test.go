@@ -99,3 +99,34 @@ func TestManager(t *testing.T) {
 	}, 10*time.Second, 250*time.Millisecond)
 	require.Equal(t, fmt.Sprintf("%d", 2), <-handler.leaves)
 }
+
+// A node whose peers aren't up yet should still start, and join once a
+// peer appears.
+func TestJoinRetriesUntilPeerIsUp(t *testing.T) {
+	peerPort, err := getFreePort()
+	require.NoError(t, err)
+	ownPort, err := getFreePort()
+	require.NoError(t, err)
+	peerAddr := fmt.Sprintf("127.0.0.1:%d", peerPort)
+
+	m, err := manager.New(&handler{}, manager.Config{
+		NodeName:       "late-joiner",
+		BindAddr:       fmt.Sprintf("127.0.0.1:%d", ownPort),
+		Tags:           map[string]string{"rpc_addr": "127.0.0.1:1"},
+		StartJoinAddrs: []string{peerAddr},
+	})
+	require.NoError(t, err, "startup must not fail when the peer is down")
+	t.Cleanup(func() { m.Leave() })
+
+	peer, err := manager.New(&handler{}, manager.Config{
+		NodeName: "peer",
+		BindAddr: peerAddr,
+		Tags:     map[string]string{"rpc_addr": "127.0.0.1:2"},
+	})
+	require.NoError(t, err)
+	t.Cleanup(func() { peer.Leave() })
+
+	require.Eventually(t, func() bool {
+		return len(m.Members()) == 2
+	}, 10*time.Second, 250*time.Millisecond)
+}

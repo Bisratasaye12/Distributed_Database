@@ -2,6 +2,7 @@ package manager
 
 import (
 	"net"
+	"time"
 
 	"github.com/hashicorp/serf/serf"
 	"go.uber.org/zap"
@@ -77,11 +78,34 @@ func (r *Manager) setupSerf() error {
 	go r.eventHandler()
 	if r.StartJoinAddrs != nil {
 		if _, err := r.serf.Join(r.StartJoinAddrs, true); err != nil {
-			return err
+			// Peers may still be starting (or restarting). Gossip only needs
+			// one reachable member, so keep trying in the background rather
+			// than failing the whole node.
+			r.logger.Warn("serf join failed, retrying in background", zap.Error(err))
+			go r.retryJoin()
 		}
 	}
 
 	return nil
+}
+
+const (
+	joinRetryInterval = 2 * time.Second
+	joinRetryAttempts = 60
+)
+
+func (r *Manager) retryJoin() {
+	for i := 0; i < joinRetryAttempts; i++ {
+		time.Sleep(joinRetryInterval)
+		if r.serf.State() == serf.SerfShutdown {
+			return
+		}
+		if _, err := r.serf.Join(r.StartJoinAddrs, true); err == nil {
+			r.logger.Info("serf join succeeded", zap.Int("attempt", i+2))
+			return
+		}
+	}
+	r.logger.Error("giving up on serf join", zap.Strings("addrs", r.StartJoinAddrs))
 }
 
 // eventHandler is run concurrently and it listens for items in the event channel.

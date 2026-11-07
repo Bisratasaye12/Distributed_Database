@@ -4,3 +4,7 @@
 /data1
 /data2
 /terminal
+# build output
+/distributed_database
+/distsql
+/bin/

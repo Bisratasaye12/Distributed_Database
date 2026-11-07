@@ -59,6 +59,7 @@ type Consensus struct {
 	lastIdx uint64
 	idxmu   sync.RWMutex
 	tn      *raft.NetworkTransport
+	bolt    *raftboltdb.BoltStore
 }
 
 type snapshot struct {
@@ -209,6 +210,7 @@ func (c *Consensus) setupRaft(dataDir string) error {
 	if err != nil {
 		return err
 	}
+	c.bolt = stablepb
 
 	snapshotpb, err := raft.NewFileSnapshotStore(filepath.Join(dataDir, "raft"), 1, os.Stderr)
 	if err != nil {
@@ -467,7 +469,12 @@ func (c *Consensus) Close() error {
 		return err
 	}
 
-	return c.db.Close()
+	if err := c.db.Close(); err != nil {
+		return err
+	}
+
+	// releases the file lock on raft.db so the node can be reopened
+	return c.bolt.Close()
 }
 
 func (c *Consensus) GetServers() ([]*pb.Server, error) {

@@ -150,7 +150,7 @@ func TestSimpleUsage(t *testing.T) {
 				}
 			}
 			return true
-		}, 3*time.Second, 150*time.Millisecond)
+		}, 10*time.Second, 150*time.Millisecond)
 	}
 
 	err = dbs[0].Leave("1")

@@ -1,4 +1,4 @@
-module distributed_database
+module github.com/Bisratasaye12/Distributed_Database
 
 go 1.23.3
 
@@ -8,7 +8,6 @@ require (
 	github.com/hashicorp/raft-boltdb v0.0.0-20250113192317-e8660f88bcc9
 	github.com/hashicorp/serf v0.10.2
 	github.com/mattn/go-sqlite3 v1.14.24
-	github.com/nireo/distsql v0.0.0-20240101213815-0194b68a824f
 	github.com/soheilhy/cmux v0.1.5
 	github.com/spf13/cobra v1.8.1
 	github.com/stretchr/testify v1.10.0

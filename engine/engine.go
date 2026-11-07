@@ -11,7 +11,7 @@ import (
 	"time"
 
 	"github.com/mattn/go-sqlite3"
-	"github.com/nireo/distsql/pb"
+	"github.com/Bisratasaye12/Distributed_Database/pb"
 )
 
 // Engine handles database operations such that queries and executes.

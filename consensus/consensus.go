@@ -16,8 +16,8 @@ import (
 
 	"github.com/hashicorp/raft"
 	raftboltdb "github.com/hashicorp/raft-boltdb"
-	"github.com/nireo/distsql/engine"
-	"github.com/nireo/distsql/pb"
+	"github.com/Bisratasaye12/Distributed_Database/engine"
+	"github.com/Bisratasaye12/Distributed_Database/pb"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 )

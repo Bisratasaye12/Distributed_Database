@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/nireo/distsql/pb"
+	"github.com/Bisratasaye12/Distributed_Database/pb"
 )
 
 // Execute result

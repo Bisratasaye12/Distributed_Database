@@ -8,8 +8,8 @@ import (
 	"time"
 
 	"github.com/hashicorp/raft"
-	"github.com/nireo/distsql/pb"
-	"github.com/nireo/distsql/pb/encoding"
+	"github.com/Bisratasaye12/Distributed_Database/pb"
+	"github.com/Bisratasaye12/Distributed_Database/pb/encoding"
 	"github.com/stretchr/testify/require"
 )
 

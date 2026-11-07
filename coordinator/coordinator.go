@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/hashicorp/raft"
-	"github.com/nireo/distsql/consensus"
-	"github.com/nireo/distsql/manager"
-	"github.com/nireo/distsql/service"
+	"github.com/Bisratasaye12/Distributed_Database/consensus"
+	"github.com/Bisratasaye12/Distributed_Database/manager"
+	"github.com/Bisratasaye12/Distributed_Database/service"
 	"github.com/soheilhy/cmux"
 )
 

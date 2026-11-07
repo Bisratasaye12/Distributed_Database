@@ -6,9 +6,9 @@ import (
 	"path"
 	"testing"
 
-	"github.com/nireo/distsql/engine"
-	"github.com/nireo/distsql/pb"
-	"github.com/nireo/distsql/pb/encoding"
+	"github.com/Bisratasaye12/Distributed_Database/engine"
+	"github.com/Bisratasaye12/Distributed_Database/pb"
+	"github.com/Bisratasaye12/Distributed_Database/pb/encoding"
 	"github.com/stretchr/testify/require"
 )
 

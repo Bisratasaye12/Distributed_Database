@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/nireo/distsql/pb"
+	"github.com/Bisratasaye12/Distributed_Database/pb"
 	"github.com/stretchr/testify/require"
 )
 

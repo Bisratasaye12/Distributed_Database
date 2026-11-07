@@ -10,9 +10,9 @@ import (
 	"os"
 	"path/filepath"
 
-	"distributed_database/coordinator"
+	"github.com/Bisratasaye12/Distributed_Database/coordinator"
 
-	"github.com/nireo/distsql/pb"
+	"github.com/Bisratasaye12/Distributed_Database/pb"
 
 	"github.com/spf13/cobra"
 )

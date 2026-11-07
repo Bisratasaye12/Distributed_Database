@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/serf/serf"
-	"github.com/nireo/distsql/manager"
+	"github.com/Bisratasaye12/Distributed_Database/manager"
 	"github.com/stretchr/testify/require"
 )
 

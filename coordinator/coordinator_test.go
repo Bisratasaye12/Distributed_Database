@@ -12,7 +12,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/nireo/distsql/coordinator"
+	"github.com/Bisratasaye12/Distributed_Database/coordinator"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

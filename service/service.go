@@ -15,9 +15,9 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/nireo/distsql/consensus"
-	"github.com/nireo/distsql/pb"
-	"github.com/nireo/distsql/pb/encoding"
+	"github.com/Bisratasaye12/Distributed_Database/consensus"
+	"github.com/Bisratasaye12/Distributed_Database/pb"
+	"github.com/Bisratasaye12/Distributed_Database/pb/encoding"
 	"go.uber.org/zap"
 )
 
@@ -30,7 +30,7 @@ type Manager interface {
 	GetNodeAPIAddr(nodeAddr string) (string, error)
 }
 
-//go:generate mockgen -destination=store_mock.go -package=service github.com/nireo/distsql/service Store
+//go:generate mockgen -destination=store_mock.go -package=service github.com/Bisratasaye12/Distributed_Database/service Store
 
 type Store interface {
 	Exec(req *pb.Request) ([]*pb.ExecRes, error)

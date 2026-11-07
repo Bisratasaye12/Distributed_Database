@@ -1,321 +1,168 @@
 package cmd
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
-	"io"
-	"log"
 	"net/http"
 	"os"
-	"path/filepath"
+	"os/signal"
+	"syscall"
 
 	"github.com/Bisratasaye12/Distributed_Database/coordinator"
-
-	"github.com/Bisratasaye12/Distributed_Database/pb"
 
 	"github.com/spf13/cobra"
 )
 
 var nodeCmd = &cobra.Command{
 	Use:   "node",
-	Short: "Manage cluster nodes",
-	Long: `Manage distributed database cluster nodes.
+	Short: "Start nodes and manage cluster membership",
+	Long: `Start nodes and manage cluster membership.
 
-Commands:
-  start       Start a new node (bootstrap node or join existing cluster)
-  stop        Stop a running node
-  status      Check node status and health
-  join        Join an existing cluster
-  leave       Gracefully leave the cluster
-  list        List all active nodes in the cluster
+Each node uses two ports: --bind-addr for Serf gossip, and --comm-port
+for both Raft traffic and the HTTP API (they share one listener).`,
+	Example: `  # first node bootstraps a new cluster
+  distsql node start --node-name=node1 --bind-addr=127.0.0.1:7946 \
+      --comm-port=8946 --data-dir=./data1 --bootstrap
 
-Examples:
-  # Start a bootstrap node (first node)
-  distributed_database node start \
-      --bind-addr=127.0.0.1:7946 \
-      --comm-port=8946 \
-      --data-dir=./data1 \
-      --node-name=node1 \
-      --bootstrap
+  # more nodes join through the first one
+  distsql node start --node-name=node2 --bind-addr=127.0.0.1:7947 \
+      --comm-port=8947 --data-dir=./data2 \
+      --join=http://127.0.0.1:8946 --peers=127.0.0.1:7946
 
-  # Start additional node and join cluster
-  distributed_database node start \
-      --bind-addr=127.0.0.1:7947 \
-      --comm-port=8947 \
-      --data-dir=./data2 \
-      --node-name=node2 \
-      --join=http://127.0.0.1:8946
-
-  # Check node status
-  distributed_database node status --http-addr=http://127.0.0.1:8946
-
-  # Join existing cluster
-  distributed_database node join http://127.0.0.1:8946 \
-      --node-id=node3 \
-      --raft-addr=127.0.0.1:8948 \
-      --data-dir=./data3
-
-  # Leave cluster
-  distributed_database node leave \
-      --node-id=node2 \
-      --leader-addr=http://127.0.0.1:8946 \
-      --data-dir=./data2
-
-  # Stop node
-  distributed_database node stop --data-dir=./data2
-
-  # List all active nodes in the cluster
-  distributed_database node list --http-addr=http://127.0.0.1:8946`,
-}
-
-// Add this helper function
-func cleanRaftDB(dataDir string) error {
-	raftDBPath := filepath.Join(dataDir, "raft", "raft.db")
-	if _, err := os.Stat(raftDBPath); err == nil {
-		// File exists, remove it
-		if err := os.Remove(raftDBPath); err != nil {
-			return fmt.Errorf("failed to remove raft.db: %v", err)
-		}
-	}
-	return nil
+  distsql node list --addr=http://127.0.0.1:8946`,
 }
 
 var startCmd = &cobra.Command{
 	Use:   "start",
-	Short: "Start a new node",
-	Run: func(cmd *cobra.Command, args []string) {
+	Short: "Start a node and keep it running until interrupted",
+	RunE: func(cmd *cobra.Command, args []string) error {
 		bindAddr, _ := cmd.Flags().GetString("bind-addr")
 		commPort, _ := cmd.Flags().GetInt("comm-port")
 		dataDir, _ := cmd.Flags().GetString("data-dir")
 		bootstrap, _ := cmd.Flags().GetBool("bootstrap")
 		nodeName, _ := cmd.Flags().GetString("node-name")
 		joinAddr, _ := cmd.Flags().GetString("join")
+		peers, _ := cmd.Flags().GetStringSlice("peers")
 
-		// Check if data directory exists first
-		if _, err := os.Stat(dataDir); os.IsNotExist(err) {
-			// Directory doesn't exist, create it
-			if err := os.MkdirAll(dataDir, 0755); err != nil {
-				log.Fatalf("Failed to create data directory: %v", err)
-			}
-		} else if err != nil {
-			// Some other error occurred while checking
-			log.Fatalf("Failed to check data directory: %v", err)
+		if nodeName == "" {
+			return fmt.Errorf("--node-name is required")
+		}
+		if bootstrap && joinAddr != "" {
+			return fmt.Errorf("use either --bootstrap (new cluster) or --join (existing cluster), not both")
 		}
 
-		// Clean raft.db before starting
-		if err := cleanRaftDB(dataDir); err != nil {
-			log.Fatalf("Failed to clean raft.db: %v", err)
+		// Existing Raft state in dataDir is kept, so a restarted node
+		// rejoins with its log instead of starting from scratch.
+		if err := os.MkdirAll(dataDir, 0755); err != nil {
+			return fmt.Errorf("create data directory: %w", err)
 		}
 
-		config := coordinator.Config{
+		node, err := coordinator.New(coordinator.Config{
 			DataDir:           dataDir,
 			BindAddr:          bindAddr,
 			CommunicationPort: commPort,
+			StartJoinAddrs:    peers,
 			Bootstrap:         bootstrap,
 			NodeName:          nodeName,
 			LeaderStartAddr:   joinAddr,
-		}
-
-		_, err := coordinator.New(config)
+		})
 		if err != nil {
-			log.Fatalf("Failed to start node: %v", err)
+			return fmt.Errorf("start node: %w", err)
 		}
 
-		// Keep the node running
-		fmt.Printf("Node started successfully at %s\n", bindAddr)
-		select {} // Block forever
-	},
-}
+		httpAddr, _ := node.Config.HTTPAddr()
+		fmt.Fprintf(cmd.OutOrStdout(), "node %s running, HTTP API at %s (Ctrl+C to stop)\n", nodeName, httpAddr)
 
-var stopCmd = &cobra.Command{
-	Use:   "stop",
-	Short: "Stop a running node",
-	Run: func(cmd *cobra.Command, args []string) {
-		dataDir, _ := cmd.Flags().GetString("data-dir")
-		if err := cleanRaftDB(dataDir); err != nil {
-			log.Fatalf("Failed to clean raft.db: %v", err)
-		}
-		fmt.Println("Node stopped successfully")
+		stop := make(chan os.Signal, 1)
+		signal.Notify(stop, os.Interrupt, syscall.SIGTERM)
+		<-stop
+
+		fmt.Fprintln(cmd.OutOrStdout(), "shutting down")
+		return node.Close()
 	},
 }
 
 var statusCmd = &cobra.Command{
 	Use:   "status",
-	Short: "Check node status",
-	Run: func(cmd *cobra.Command, args []string) {
-		httpAddr, _ := cmd.Flags().GetString("http-addr")
-		if httpAddr == "" {
-			log.Fatal("--http-addr flag is required")
+	Short: "Show runtime and Raft metrics for a node",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		var metrics map[string]any
+		if err := do(http.MethodGet, addrFlag(cmd)+"/metric", nil, &metrics); err != nil {
+			return err
 		}
 
-		resp, err := http.Get(fmt.Sprintf("%s/metric", httpAddr))
+		pretty, err := json.MarshalIndent(metrics, "", "  ")
 		if err != nil {
-			log.Fatalf("Failed to get node status: %v", err)
+			return err
 		}
-		defer resp.Body.Close()
-
-		var status map[string]interface{}
-		if err := json.NewDecoder(resp.Body).Decode(&status); err != nil {
-			log.Fatalf("Failed to decode status response: %v", err)
-		}
-
-		prettyJSON, _ := json.MarshalIndent(status, "", "  ")
-		fmt.Printf("Node Status:\n%s\n", string(prettyJSON))
+		fmt.Fprintln(cmd.OutOrStdout(), string(pretty))
+		return nil
 	},
 }
 
 var joinCmd = &cobra.Command{
-	Use:   "join <address>",
-	Short: "Join a node to the cluster",
-	Args:  cobra.ExactArgs(1),
-	Run: func(cmd *cobra.Command, args []string) {
-		address := args[0]
+	Use:   "join",
+	Short: "Add a running node to the cluster as a voter",
+	RunE: func(cmd *cobra.Command, args []string) error {
 		nodeID, _ := cmd.Flags().GetString("node-id")
 		raftAddr, _ := cmd.Flags().GetString("raft-addr")
-		dataDir, _ := cmd.Flags().GetString("data-dir")
-
-		if err := cleanRaftDB(dataDir); err != nil {
-			log.Fatalf("Failed to clean raft.db: %v", err)
+		if nodeID == "" || raftAddr == "" {
+			return fmt.Errorf("--node-id and --raft-addr are required")
 		}
 
-		body := map[string]string{
-			"id":   nodeID,
-			"addr": raftAddr,
+		body := map[string]string{"id": nodeID, "addr": raftAddr}
+		if err := do(http.MethodPost, addrFlag(cmd)+"/join", body, nil); err != nil {
+			return err
 		}
-
-		jsonBody, err := json.Marshal(body)
-		if err != nil {
-			log.Fatalf("Failed to marshal join request: %v", err)
-		}
-
-		resp, err := http.Post(fmt.Sprintf("%s/join", address), "application/json", bytes.NewBuffer(jsonBody))
-		if err != nil {
-			log.Fatalf("Failed to join cluster: %v", err)
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			log.Fatalf("Failed to join cluster: received status %d", resp.StatusCode)
-		}
-
-		fmt.Printf("Node joined cluster at %s successfully\n", address)
+		fmt.Fprintf(cmd.OutOrStdout(), "%s joined the cluster\n", nodeID)
+		return nil
 	},
 }
 
 var leaveCmd = &cobra.Command{
 	Use:   "leave",
-	Short: "Leave the cluster",
-	Run: func(cmd *cobra.Command, args []string) {
+	Short: "Remove a node from the cluster",
+	RunE: func(cmd *cobra.Command, args []string) error {
 		nodeID, _ := cmd.Flags().GetString("node-id")
-		leaderAddr, _ := cmd.Flags().GetString("leader-addr")
-		dataDir, _ := cmd.Flags().GetString("data-dir")
-
-		if err := cleanRaftDB(dataDir); err != nil {
-			log.Fatalf("Failed to clean raft.db: %v", err)
+		if nodeID == "" {
+			return fmt.Errorf("--node-id is required")
 		}
 
-		body := map[string]string{
-			"id": nodeID,
+		if err := do(http.MethodPost, addrFlag(cmd)+"/leave", map[string]string{"id": nodeID}, nil); err != nil {
+			return err
 		}
-
-		jsonBody, err := json.Marshal(body)
-		if err != nil {
-			log.Fatalf("Failed to marshal leave request: %v", err)
-		}
-
-		resp, err := http.Post(fmt.Sprintf("%s/leave", leaderAddr), "application/json", bytes.NewBuffer(jsonBody))
-		if err != nil {
-			log.Fatalf("Failed to leave cluster: %v", err)
-		}
-		defer resp.Body.Close()
-
-		if resp.StatusCode != http.StatusOK {
-			log.Fatalf("Failed to leave cluster: received status %d", resp.StatusCode)
-		}
-
-		fmt.Println("Node left the cluster successfully")
+		fmt.Fprintf(cmd.OutOrStdout(), "%s left the cluster\n", nodeID)
+		return nil
 	},
 }
 
 var listCmd = &cobra.Command{
 	Use:   "list",
-	Short: "List all active nodes in the cluster",
-	Run: func(cmd *cobra.Command, args []string) {
-		httpAddr, _ := cmd.Flags().GetString("http-addr")
-		if httpAddr == "" {
-			log.Fatal("--http-addr flag is required")
-		}
-
-		url := fmt.Sprintf("%s/servers", httpAddr)
-		log.Printf("Making request to: %s", url)
-
-		resp, err := http.Get(url)
+	Short: "List the nodes in the cluster and which one is leader",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		servers, err := listServers(addrFlag(cmd))
 		if err != nil {
-			log.Fatalf("Failed to get node list: %v", err)
+			return err
 		}
-		defer resp.Body.Close()
-
-		body, _ := io.ReadAll(resp.Body)
-		if resp.StatusCode != http.StatusOK {
-			log.Printf("Response body: %s", string(body))
-			log.Fatalf("Failed to get node list: received status %d", resp.StatusCode)
-		}
-
-		var response struct {
-			Servers []*pb.Server `json:"servers"`
-		}
-		if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
-			log.Fatalf("Failed to decode response: %v", err)
-		}
-
-		// Print the node list in a formatted table
-		fmt.Printf("\nCluster Nodes:\n")
-		fmt.Printf("%-20s %-30s %-10s\n", "NODE ID", "ADDRESS", "ROLE")
-		fmt.Printf("%-20s %-30s %-10s\n", "-------", "-------", "----")
-
-		for _, server := range response.Servers {
-			role := "follower"
-			if server.IsLeader {
-				role = "leader"
-			}
-			fmt.Printf("%-20s %-30s %-10s\n", server.Id, server.RpcAddr, role)
-		}
-		fmt.Println()
+		printServers(cmd.OutOrStdout(), servers)
+		return nil
 	},
 }
 
 func init() {
-	// Add flags for start command
-	startCmd.Flags().String("bind-addr", "127.0.0.1:7946", "Address to bind Serf on")
-	startCmd.Flags().Int("comm-port", 8946, "Port for Raft and HTTP communication")
-	startCmd.Flags().String("data-dir", "data", "Directory to store node data")
-	startCmd.Flags().Bool("bootstrap", false, "Bootstrap the cluster")
-	startCmd.Flags().String("node-name", "", "Unique node identifier")
-	startCmd.Flags().String("join", "", "Leader address to join")
+	startCmd.Flags().String("bind-addr", "127.0.0.1:7946", "address for Serf gossip")
+	startCmd.Flags().Int("comm-port", 8946, "port for Raft and the HTTP API")
+	startCmd.Flags().String("data-dir", "data", "directory for the SQLite database and Raft log")
+	startCmd.Flags().Bool("bootstrap", false, "start a new cluster with this node as the first member")
+	startCmd.Flags().String("node-name", "", "unique node id (required)")
+	startCmd.Flags().String("join", "", "HTTP address of a cluster member to join through")
+	startCmd.Flags().StringSlice("peers", nil, "Serf addresses of existing members, for gossip")
 
-	// Add flags for status command
-	statusCmd.Flags().String("http-addr", "", "HTTP address of the node")
+	joinCmd.Flags().String("node-id", "", "id of the node to add")
+	joinCmd.Flags().String("raft-addr", "", "Raft address of the node to add")
 
-	// Add flags for join command
-	joinCmd.Flags().String("node-id", "", "Unique identifier for the node")
-	joinCmd.Flags().String("raft-addr", "", "Address for Raft communication")
-	joinCmd.Flags().String("data-dir", "data", "Directory to store node data")
+	leaveCmd.Flags().String("node-id", "", "id of the node to remove")
 
-	// Add flags for leave command
-	leaveCmd.Flags().String("node-id", "", "Unique identifier for the node")
-	leaveCmd.Flags().String("leader-addr", "", "Address of the cluster leader")
-	leaveCmd.Flags().String("data-dir", "data", "Directory to store node data")
-
-	// Add flags for stop command
-	stopCmd.Flags().String("data-dir", "data", "Directory to store node data")
-
-	// Fix: Register http-addr flag for list command
-	listCmd.Flags().String("http-addr", "", "HTTP address of any node in the cluster")
-
-	// Add subcommands to the node command
-	nodeCmd.AddCommand(startCmd, stopCmd, statusCmd, joinCmd, leaveCmd, listCmd)
-
-	// Register `node` command with the root command
+	nodeCmd.AddCommand(startCmd, statusCmd, joinCmd, leaveCmd, listCmd)
 	rootCmd.AddCommand(nodeCmd)
 }

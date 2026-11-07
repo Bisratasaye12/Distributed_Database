@@ -1,6 +1,3 @@
-/*
-Copyright © 2025 NAME HERE <EMAIL ADDRESS>
-*/
 package cmd
 
 import (
@@ -12,33 +9,32 @@ import (
 
 // rootCmd represents the base command when called without any subcommands
 var rootCmd = &cobra.Command{
-	Use:   "distribute_database",
-	Short: "A distributed SQL database",
-	Long: `A distributed SQL database built with Go that supports 
-distributed operations such as replication, membership management, 
-and failure recovery.`,
-	// Uncomment the following line if your bare application
-	// has an action associated with it:
-	// Run: func(cmd *cobra.Command, args []string) { },
+	Use:   "distsql",
+	Short: "Run and talk to a distsql cluster",
+	Long: `distsql runs nodes of a Raft-replicated SQLite cluster and sends them
+SQL over HTTP.
+
+Start a node with "distsql node start", then use "distsql exec" for
+writes and "distsql query" for reads. Any node accepts requests; writes
+sent to a follower are redirected to the leader.`,
+	SilenceUsage:  true,
+	SilenceErrors: true,
 }
 
 // Execute adds all child commands to the root command and sets flags appropriately.
 // This is called by main.main(). It only needs to happen once to the rootCmd.
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, "Error:", err)
 		os.Exit(1)
 	}
 }
 
 func init() {
-	// Here you will define your flags and configuration settings.
-	// Cobra supports persistent flags, which, if defined here,
-	// will be global for your application.
+	rootCmd.PersistentFlags().String("addr", "http://127.0.0.1:8946", "HTTP address of any node in the cluster")
+}
 
-	// rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file (default is $HOME/.distribute_database.yaml)")
-
-	// Cobra also supports local flags, which will only run
-	// when this action is called directly.
-	rootCmd.Flags().BoolP("toggle", "t", false, "Help message for toggle")
+func addrFlag(cmd *cobra.Command) string {
+	addr, _ := cmd.Flags().GetString("addr")
+	return addr
 }

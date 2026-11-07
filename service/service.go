@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"net/http/pprof"
@@ -188,7 +187,6 @@ func createTLS(certFile, keyFile, caFile string) (*tls.Config, error) {
 }
 
 func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	log.Printf("DEBUG: Received HTTP request: %s %s", r.Method, r.URL.Path)
 	switch {
 	case strings.HasPrefix(r.URL.Path, "/join"):
 		s.join(w, r)
@@ -202,11 +200,9 @@ func (s *Service) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		s.pprofHandler(w, r)
 	case strings.HasPrefix(r.URL.Path, "/metric"):
 		s.metricHandler(w, r)
-	case strings.HasPrefix(r.URL.Path, "/server"):
-		log.Printf("DEBUG: Handling server list request")
+	case strings.HasPrefix(r.URL.Path, "/servers"):
 		s.serversHandler(w, r)
 	default:
-		log.Printf("DEBUG: No handler found for path: %s", r.URL.Path)
 		w.WriteHeader(http.StatusNotFound)
 	}
 }
@@ -662,7 +658,6 @@ func (s *Service) serversHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
-	log.Println("Getting servers")
 	servers, err := s.store.GetServers()
 	if err != nil {
 		if err == consensus.ErrNotLeader {
@@ -680,7 +675,6 @@ func (s *Service) serversHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Println("Servers:", servers)
 
 	response := struct {
 		Servers []*pb.Server `json:"servers"`

@@ -11,9 +11,17 @@ compile:
 lint:
 	golangci-lint run ./...
 
+.PHONY: build
+build:
+	go build -o bin/distsql .
+
 .PHONY: test
 test:
-	go test -v ./...
+	go test ./...
+
+.PHONY: cluster
+cluster:
+	docker compose up -d --build
 
 .PHONY: generate
 generate:

@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"log"
 	"math"
 	"os"
 	"path/filepath"
@@ -189,15 +188,9 @@ func NewDB(dataDir string, config *Config) (*Consensus, error) {
 func (c *Consensus) setupDB(dataDir string) error {
 	dbDir := filepath.Join(dataDir, "db")
 
-	// Check if data directory exists first
-	if _, err := os.Stat(dataDir); os.IsNotExist(err) {
-		// Directory doesn't exist, create it
-		if err := os.MkdirAll(dataDir, 0755); err != nil {
-			log.Fatalf("Failed to create data directory: %v", err)
-		}
-	} else if err != nil {
-		// Some other error occurred while checking
-		log.Fatalf("Failed to check data directory: %v", err)
+	// MkdirAll so a restarted node can reuse its existing data directory
+	if err := os.MkdirAll(dbDir, 0755); err != nil {
+		return err
 	}
 
 	var err error
@@ -206,17 +199,8 @@ func (c *Consensus) setupDB(dataDir string) error {
 }
 
 func (c *Consensus) setupRaft(dataDir string) error {
-	// Check if raft directory exists first
-	raftDir := filepath.Join(dataDir, "raft")
-	// Check if raft directory exists first
-	if _, err := os.Stat(raftDir); os.IsNotExist(err) {
-		// Directory doesn't exist, create it
-		if err := os.Mkdir(raftDir, os.ModePerm); err != nil {
-			log.Fatalf("Failed to create raft directory: %v", err)
-		}
-	} else if err != nil {
-		// Some other error occurred while checking
-		log.Fatalf("Failed to check raft directory: %v", err)
+	if err := os.MkdirAll(filepath.Join(dataDir, "raft"), os.ModePerm); err != nil {
+		return err
 	}
 
 	c.raftDir = dataDir

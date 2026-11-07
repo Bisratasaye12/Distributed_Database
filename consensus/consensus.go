@@ -36,6 +36,9 @@ var (
 
 	// ErrJoinSelf happens when a node tries to join itself.
 	ErrJoinSelf = errors.New("trying to join self")
+
+	// ErrEmptyJoin is returned when Join is called without an id or address.
+	ErrEmptyJoin = errors.New("join needs both a node id and an address")
 )
 
 // Config configures parts of raft and also transport that is used.
@@ -513,6 +516,12 @@ func (c *Consensus) GetServers() ([]*pb.Server, error) {
 
 func (c *Consensus) Join(id, addr string) error {
 	c.log.Info("request to join node", zap.String("id", id), zap.String("addr", addr))
+
+	// An empty address would look like an address change below and remove
+	// the existing server from the cluster.
+	if id == "" || addr == "" {
+		return ErrEmptyJoin
+	}
 
 	if !c.IsLeader() {
 		return ErrNotLeader

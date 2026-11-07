@@ -252,11 +252,18 @@ func (c *Coordinator) setupManager() error {
 		return err
 	}
 
+	raftAddr, err := c.Config.RaftAddr()
+	if err != nil {
+		return err
+	}
+
 	c.manager, err = manager.New(c.raft, manager.Config{
 		NodeName: c.Config.NodeName,
 		BindAddr: c.Config.BindAddr,
+		// the manager reads rpc_addr when it adds a gossip peer to Raft
 		Tags: map[string]string{
-			"addr": addr,
+			"addr":     addr,
+			"rpc_addr": raftAddr,
 		},
 		StartJoinAddrs: c.Config.StartJoinAddrs,
 	})

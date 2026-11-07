@@ -255,3 +255,16 @@ func TestRestartDoesNotReapplyWrites(t *testing.T) {
 		return strings.Contains(count(), `"values":[[1]]`)
 	}, 10*time.Second, 100*time.Millisecond, "got %s", count())
 }
+
+func TestJoinWithEmptyAddressKeepsTheServer(t *testing.T) {
+	port, err := getFreePort()
+	require.NoError(t, err)
+	leader := openSingleNode(t, t.TempDir(), port)
+	t.Cleanup(func() { leader.Close() })
+
+	require.ErrorIs(t, leader.Join("1", ""), ErrEmptyJoin)
+
+	servers, err := leader.GetServers()
+	require.NoError(t, err)
+	require.Len(t, servers, 1)
+}

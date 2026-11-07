@@ -60,6 +60,9 @@ type Consensus struct {
 	idxmu   sync.RWMutex
 	tn      *raft.NetworkTransport
 	bolt    *raftboltdb.BoltStore
+
+	hadState     bool
+	bootstrapped bool
 }
 
 type snapshot struct {
@@ -267,6 +270,8 @@ func (c *Consensus) setupRaft(dataDir string) error {
 		return err
 	}
 
+	c.hadState = hasState
+
 	if c.config.Raft.Bootstrap && !hasState {
 		config := raft.Configuration{
 			Servers: []raft.Server{{
@@ -275,6 +280,7 @@ func (c *Consensus) setupRaft(dataDir string) error {
 			}},
 		}
 		err = c.raft.BootstrapCluster(config).Error()
+		c.bootstrapped = err == nil
 	}
 	return err
 }
@@ -567,6 +573,17 @@ func (c *Consensus) Leave(id string) error {
 	}
 
 	return nil
+}
+
+// HadState reports whether the node started with Raft state from an
+// earlier run, meaning it is already a cluster member.
+func (c *Consensus) HadState() bool {
+	return c.hadState
+}
+
+// Bootstrapped reports whether this start created a brand new cluster.
+func (c *Consensus) Bootstrapped() bool {
+	return c.bootstrapped
 }
 
 func (c *Consensus) WaitForLeader(timeout time.Duration) error {

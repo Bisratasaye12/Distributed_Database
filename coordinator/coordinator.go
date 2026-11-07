@@ -142,17 +142,24 @@ func (c *Coordinator) setupRaft() error {
 		c.Config.ServerTLS,
 		c.Config.PeerTLS,
 	)
+	raftAddr, err := c.Config.RaftAddr()
+	if err != nil {
+		return err
+	}
+	conf.Transport.Advertise(raftAddr)
 	conf.Raft.LocalID = raft.ServerID(c.Config.NodeName)
 	conf.Raft.Bootstrap = c.Config.Bootstrap
 
 	// create raft instance and bootstrap the cluster if neccesary
-	var err error
 	c.raft, err = consensus.NewDB(c.Config.DataDir, conf)
 	if err != nil {
 		return err
 	}
 
-	if c.Config.Bootstrap {
+	// A fresh single-node cluster elects itself almost immediately. A node
+	// restarting into an existing cluster may wait longer for an election,
+	// so don't fail its startup on this timeout.
+	if c.raft.Bootstrapped() {
 		err = c.raft.WaitForLeader(3 * time.Second)
 	}
 
@@ -198,8 +205,9 @@ func (c *Coordinator) serve() error {
 }
 
 func (c *Coordinator) joinToLeader() error {
-	// don't connect to anything this is fine.
-	if c.Config.LeaderStartAddr == "" {
+	// don't connect to anything this is fine. A node with Raft state from
+	// an earlier run is already a member and doesn't need to join again.
+	if c.Config.LeaderStartAddr == "" || c.raft.HadState() {
 		return nil
 	}
 

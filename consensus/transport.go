@@ -14,7 +14,20 @@ type Transport struct {
 	ln        net.Listener
 	servertls *tls.Config
 	peertls   *tls.Config
+	advertise string
 }
+
+// Advertise sets the address other nodes should use to reach this one,
+// for example "node1:8946" in Docker, where the listener's own address
+// is a container IP that can change when the container restarts.
+func (tn *Transport) Advertise(addr string) {
+	tn.advertise = addr
+}
+
+type advertiseAddr string
+
+func (a advertiseAddr) Network() string { return "tcp" }
+func (a advertiseAddr) String() string  { return string(a) }
 
 // NewTransport creates a new transport instance.
 func NewTransport(ln net.Listener) *Transport {
@@ -84,5 +97,8 @@ func (tn *Transport) Close() error {
 
 // Addr returns a net.Addr representing the address Transport is listening on.
 func (tn *Transport) Addr() net.Addr {
+	if tn.advertise != "" {
+		return advertiseAddr(tn.advertise)
+	}
 	return tn.ln.Addr()
 }

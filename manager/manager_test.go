@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/serf/serf"
 	"github.com/Bisratasaye12/Distributed_Database/manager"
+	"github.com/hashicorp/serf/serf"
 	"github.com/stretchr/testify/require"
 )
 

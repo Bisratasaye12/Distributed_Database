@@ -7,8 +7,8 @@ package service
 import (
 	reflect "reflect"
 
-	gomock "github.com/golang/mock/gomock"
 	pb "github.com/Bisratasaye12/Distributed_Database/pb"
+	gomock "github.com/golang/mock/gomock"
 )
 
 // MockStore is a mock of Store interface.

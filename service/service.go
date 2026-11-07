@@ -675,7 +675,6 @@ func (s *Service) serversHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-
 	response := struct {
 		Servers []*pb.Server `json:"servers"`
 	}{

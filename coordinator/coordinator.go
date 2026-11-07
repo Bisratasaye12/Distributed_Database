@@ -12,10 +12,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashicorp/raft"
 	"github.com/Bisratasaye12/Distributed_Database/consensus"
 	"github.com/Bisratasaye12/Distributed_Database/manager"
 	"github.com/Bisratasaye12/Distributed_Database/service"
+	"github.com/hashicorp/raft"
 	"github.com/soheilhy/cmux"
 )
 

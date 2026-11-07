@@ -8,9 +8,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hashicorp/raft"
 	"github.com/Bisratasaye12/Distributed_Database/pb"
 	"github.com/Bisratasaye12/Distributed_Database/pb/encoding"
+	"github.com/hashicorp/raft"
 	"github.com/stretchr/testify/require"
 )
 

@@ -10,8 +10,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/mattn/go-sqlite3"
 	"github.com/Bisratasaye12/Distributed_Database/pb"
+	"github.com/mattn/go-sqlite3"
 )
 
 // Engine handles database operations such that queries and executes.

@@ -13,10 +13,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashicorp/raft"
-	raftboltdb "github.com/hashicorp/raft-boltdb"
 	"github.com/Bisratasaye12/Distributed_Database/engine"
 	"github.com/Bisratasaye12/Distributed_Database/pb"
+	"github.com/hashicorp/raft"
+	raftboltdb "github.com/hashicorp/raft-boltdb"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
 )

@@ -179,10 +179,15 @@ func TestWritesToLeaderQueryFromFollower(t *testing.T) {
 	followerAddr1, err := coordinators[1].Config.HTTPAddr()
 	require.NoError(t, err)
 
-	time.Sleep(1 * time.Second)
-	data2 := sendQueryStmts(t, followerAddr1, []string{
-		`SELECT * FROM test`,
-	})
+	// followers apply the log asynchronously, so poll instead of sleeping
+	want := `{"results":[{"columns":["id","name"],"types":["integer","text"],"values":[[1,"atest"],[2,"btest"]]}]}`
+	var data2 []byte
+	require.Eventually(t, func() bool {
+		data2 = sendQueryStmts(t, followerAddr1, []string{
+			`SELECT * FROM test`,
+		})
+		return string(data2) == want
+	}, 10*time.Second, 200*time.Millisecond)
 
 	require.Equal(t, `{"results":[{},{"last_insert_id":1,"rows_affected":1},{"last_insert_id":2,"rows_affected":1}]}`, string(data))
 	require.Equal(t, `{"results":[{"columns":["id","name"],"types":["integer","text"],"values":[[1,"atest"],[2,"btest"]]}]}`, string(data2))

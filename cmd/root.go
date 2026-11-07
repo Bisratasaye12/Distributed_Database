@@ -31,7 +31,11 @@ func Execute() {
 }
 
 func init() {
-	rootCmd.PersistentFlags().String("addr", "http://127.0.0.1:8946", "HTTP address of any node in the cluster")
+	defaultAddr := os.Getenv("DISTSQL_ADDR")
+	if defaultAddr == "" {
+		defaultAddr = "http://127.0.0.1:8946"
+	}
+	rootCmd.PersistentFlags().String("addr", defaultAddr, "HTTP address of any node in the cluster (env DISTSQL_ADDR)")
 }
 
 func addrFlag(cmd *cobra.Command) string {

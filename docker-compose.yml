@@ -1,0 +1,43 @@
+# Three-node cluster. node1 bootstraps; node2 and node3 join through it.
+#
+#   docker compose up -d --build
+#   docker compose exec node1 distsql node list
+#   docker compose exec node2 distsql exec "CREATE TABLE t (id INTEGER PRIMARY KEY, v TEXT)"
+#   docker compose exec node3 distsql query "SELECT * FROM t"
+#   docker compose stop node1      # watch a new leader take over
+x-node: &node
+  build: .
+  restart: unless-stopped
+
+services:
+  node1:
+    <<: *node
+    command: >
+      node start --node-name=node1 --bind-addr=node1:7946 --comm-port=8946
+      --data-dir=/data --bootstrap
+    environment: [DISTSQL_ADDR=http://node1:8946]
+    volumes: [node1:/data]
+    ports: ["8946:8946"]
+
+  node2:
+    <<: *node
+    command: >
+      node start --node-name=node2 --bind-addr=node2:7946 --comm-port=8946
+      --data-dir=/data --join=http://node1:8946 --peers=node1:7946
+    environment: [DISTSQL_ADDR=http://node2:8946]
+    volumes: [node2:/data]
+    depends_on: [node1]
+
+  node3:
+    <<: *node
+    command: >
+      node start --node-name=node3 --bind-addr=node3:7946 --comm-port=8946
+      --data-dir=/data --join=http://node1:8946 --peers=node1:7946
+    environment: [DISTSQL_ADDR=http://node3:8946]
+    volumes: [node3:/data]
+    depends_on: [node1]
+
+volumes:
+  node1:
+  node2:
+  node3:

@@ -250,7 +250,7 @@ func (s *Service) join(w http.ResponseWriter, r *http.Request) {
 			}
 
 			redirect := s.redirectAddr(r, leaderAddr)
-			http.Redirect(w, r, redirect, http.StatusMovedPermanently)
+			http.Redirect(w, r, redirect, http.StatusTemporaryRedirect)
 			return
 		}
 
@@ -293,7 +293,7 @@ func (s *Service) leave(w http.ResponseWriter, r *http.Request) {
 			}
 
 			redirect := s.redirectAddr(r, leaderAddr)
-			http.Redirect(w, r, redirect, http.StatusMovedPermanently)
+			http.Redirect(w, r, redirect, http.StatusTemporaryRedirect)
 			return
 		}
 
@@ -348,8 +348,7 @@ func (s *Service) execHandler(w http.ResponseWriter, r *http.Request) {
 			}
 
 			redirect := s.redirectAddr(r, leaderAddr)
-			fmt.Println("REDIRECT", redirect)
-			http.Redirect(w, r, redirect, http.StatusMovedPermanently)
+			http.Redirect(w, r, redirect, http.StatusTemporaryRedirect)
 			return
 		}
 		response.Error = err.Error()
@@ -543,7 +542,7 @@ func (s *Service) queryHandler(w http.ResponseWriter, r *http.Request) {
 			}
 
 			redirect := s.redirectAddr(r, leaderAddr)
-			http.Redirect(w, r, redirect, http.StatusMovedPermanently)
+			http.Redirect(w, r, redirect, http.StatusTemporaryRedirect)
 			return
 		}
 		resp.Error = err.Error()
@@ -674,7 +673,7 @@ func (s *Service) serversHandler(w http.ResponseWriter, r *http.Request) {
 			}
 
 			redirect := s.redirectAddr(r, leaderAddr)
-			http.Redirect(w, r, redirect, http.StatusMovedPermanently)
+			http.Redirect(w, r, redirect, http.StatusTemporaryRedirect)
 			return
 		}
 		http.Error(w, err.Error(), http.StatusInternalServerError)
